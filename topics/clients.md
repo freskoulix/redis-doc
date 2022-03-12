@@ -46,14 +46,14 @@ However Redis does the following two things when serving clients:
 Maximum number of clients
 ---
 
-In Redis 2.4 there was an hard-coded limit about the maximum number of clients
-that was possible to handle simultaneously.
+In Redis 2.4 there was a hard-coded limit for the maximum number of clients
+that could be handled simultaneously.
 
-In Redis 2.6 this limit is dynamic: by default is set to 10000 clients, unless
+In Redis 2.6 this limit is dynamic: by default it is set to 10000 clients, unless
 otherwise stated by the `maxclients` directive in Redis.conf.
 
-However Redis checks with the kernel what is the maximum number of file
-descriptors that we are able to open (the *soft limit* is checked), if the
+However, Redis checks with the kernel what is the maximum number of file
+descriptors that we are able to open (the *soft limit* is checked). If the
 limit is smaller than the maximum number of clients we want to handle, plus
 32 (that is the number of file descriptors Redis reserves for internal uses),
 then the number of maximum clients is modified by Redis to match the amount
@@ -104,7 +104,7 @@ Different kind of clients have different default limits:
 
 * **Normal clients** have a default limit of 0, that means, no limit at all, because most normal clients use blocking implementations sending a single command and waiting for the reply to be completely read before sending the next command, so it is always not desirable to close the connection in case of a normal client.
 * **Pub/Sub clients** have a default hard limit of 32 megabytes and a soft limit of 8 megabytes per 60 seconds.
-* **Slaves** have a default hard limit of 256 megabytes and a soft limit of 64 megabyte per 60 second.
+* **Replicas** have a default hard limit of 256 megabytes and a soft limit of 64 megabyte per 60 second.
 
 It is possible to change the limit at runtime using the `CONFIG SET` command or in a permanent way using the Redis configuration file `redis.conf`. See the example `redis.conf` in the Redis distribution for more information about how to set the limit.
 
@@ -112,6 +112,46 @@ Query buffer hard limit
 ---
 
 Every client is also subject to a query buffer limit. This is a non-configurable hard limit that will close the connection when the client query buffer (that is the buffer we use to accumulate commands from the client) reaches 1 GB, and is actually only an extreme limit to avoid a server crash in case of client or server software bugs.
+
+Client Eviction
+---
+
+Redis commonly handles a very large number of client connections.
+Client connections tend to consume memory, and when there are many of them, the aggregate memory consumption can be extremely high, leading to data eviction or out-of-memory errors.
+These cases can be mitigated to an extent using [output buffer limits](#output-buffers-limits), but Redis allows us a more robust configuration to limit the aggregate memory used by all clients' connections.
+
+
+This mechanism is called **client eviction**, and it's essentially a safety mechanism that will disconnect clients once the aggregate memory usage of all clients is above a threshold.
+The mechanism first attempts to disconnect clients that use the most memory.
+It disconnects the minimal number of clients needed to return below the `maxmemory-clients` threshold.
+
+`maxmemory-clients` defines the maximum aggregate memory usage of all clients connected to Redis.
+The aggregation takes into account all the memory used by the client connections: the [query buffer](#query-buffer-hard-limit), the output buffer, and other intermediate buffers.
+
+Note that replica and master connections aren't affected by the client eviction mechanism. Therefore, such connections are never evicted.
+
+`maxmemory-clients` can be set permanently in the configuration file (`redis.conf`) or via the `CONFIG SET` command.
+This setting can either be 0 (meaning no limit), a size in bytes (possibly with `mb`/`gb` suffix),
+or a percentage of `maxmemory` by using the `%` suffix (e.g. setting it to `10%` would mean 10% of the `maxmemory` configuration).
+
+The default setting it 0, meaning client eviction is turned off by default.
+However, for any large production deployment, it is highly recommended to configure some non-zero `maxmemory-clients` value.
+A value `5%`, for example, can be a good place to start.
+
+It is possible to flag a specific client connection to be excluded from the client eviction mechanism.
+This is useful for control path connections.
+If, for example, you have an application that monitors the server via the `INFO` command and alerts you in case of a problem, you might want to make sure this connection isn't evicted.
+You can do so using the following command (from the relevant client's connection):
+
+`CLIENT NO-EVICT` `on`
+
+And you can revert that with:
+
+`CLIENT NO-EVICT` `off`
+
+For more information and an example refer to the `maxmemory-clients` section in the default `redis.conf` file.
+
+Client eviction is available since Redis 7.0.
 
 Client timeouts
 ---
@@ -153,12 +193,19 @@ In the above example session two clients are connected to the Redis server. The 
 * **name**: The client name as set by `CLIENT SETNAME`.
 * **age**: The number of seconds the connection existed for.
 * **idle**: The number of seconds the connection is idle.
-* **flags**: The kind of client (N means normal client, check the [full list of flags](http://redis.io/commands/client-list)).
+* **flags**: The kind of client (N means normal client, check the [full list of flags](https://redis.io/commands/client-list)).
 * **omem**: The amount of memory used by the client for the output buffer.
 * **cmd**: The last executed command.
 
-See the [CLIENT LIST](http://redis.io/commands/client-list) documentation for the full list of fields and their meaning.
+See the [CLIENT LIST](https://redis.io/commands/client-list) documentation for the full list of fields and their meaning.
 
 Once you have the list of clients, you can easily close the connection with a client using the `CLIENT KILL` command specifying the client address as argument.
 
-The commands `CLIENT SETNAME` and `CLIENT GETNAME` can be used to set and get the connection name.
+The commands `CLIENT SETNAME` and `CLIENT GETNAME` can be used to set and get the connection name. Starting with Redis 4.0, the client name is shown in the
+`SLOWLOG` output, so that it gets simpler to identify clients that are creating
+latency issues.
+
+TCP keepalive
+---
+
+Recent versions of Redis (3.2 or greater) have TCP keepalive (`SO_KEEPALIVE` socket option) enabled by default and set to about 300 seconds. This option is useful in order to detect dead peers (clients that cannot be reached even if they look connected). Moreover, if there is network equipment between clients and servers that need to see some traffic in order to take the connection open, the option will prevent unexpected connection closed events.

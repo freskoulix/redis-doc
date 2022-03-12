@@ -1,15 +1,15 @@
 In Redis Cluster, each node keeps track of which master is serving
 a particular hash slot.
 
-The `DELSLOTS` command asks a particular Redis Cluster node to
+The `CLUSTER DELSLOTS` command asks a particular Redis Cluster node to
 forget which master is serving the hash slots specified as arguments.
 
-In the context of a node that has received a `DELSLOTS` command and
+In the context of a node that has received a `CLUSTER DELSLOTS` command and
 has consequently removed the associations for the passed hash slots,
 we say those hash slots are *unbound*. Note that the existence of
 unbound hash slots occurs naturally when a node has not been
 configured to handle them (something that can be done with the
-`ADDSLOTS` command) and if it has not received any information about
+`CLUSTER ADDSLOTS` command) and if it has not received any information about
 who owns those hash slots (something that it can learn from heartbeat
 or update messages).
 
@@ -39,7 +39,7 @@ The following command removes the association for slots 5000 and
 
 This command only works in cluster mode and may be useful for
 debugging and in order to manually orchestrate a cluster configuration
-when a new cluster is created. It is currently not used by `redis-trib`,
+when a new cluster is created. It is currently not used by `redis-cli`,
 and mainly exists for API completeness.
 
 @return

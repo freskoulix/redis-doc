@@ -7,7 +7,7 @@ The command is atomic and blocks the two instances for the time required to
 transfer the key, at any given time the key will appear to exist in a given
 instance or in the other instance, unless a timeout error occurs. In 3.2 and
 above, multiple keys can be pipelined in a single call to `MIGRATE` by passing
-the empty string ("") as key and adding the `KEYS` clause.
+the empty string ("") as key and adding the `!KEYS` clause.
 
 The command internally uses `DUMP` to generate the serialized version of the key
 value, and `RESTORE` in order to synthesize the key in the target instance.
@@ -48,9 +48,9 @@ uses pipelining in order to migrate multiple keys between instances without
 incurring in the round trip time latency and other overheads that there are
 when moving each key with a single `MIGRATE` call.
 
-In order to enable this form, the `KEYS` option is used, and the normal *key*
+In order to enable this form, the `!KEYS` option is used, and the normal *key*
 argument is set to an empty string. The actual key names will be provided
-after the `KEYS` argument itself, like in the following example:
+after the `!KEYS` argument itself, like in the following example:
 
     MIGRATE 192.168.1.34 6379 "" 0 5000 KEYS key1 key2 key3
 
@@ -60,14 +60,13 @@ just a single key exists.
 
 ## Options
 
-* `COPY` -- Do not remove the key from the local instance.
+* `!COPY` -- Do not remove the key from the local instance.
 * `REPLACE` -- Replace existing key on the remote instance.
-* `KEYS` -- If the key argument is an empty string, the command will instead migrate all the keys that follow the `KEYS` option (see the above section for more info).
-
-`COPY` and `REPLACE` are available only in 3.0 and above.
-`KEYS` is available starting with Redis 3.0.6.
+* `!KEYS` -- If the key argument is an empty string, the command will instead migrate all the keys that follow the `!KEYS` option (see the above section for more info).
+* `!AUTH` -- Authenticate with the given password to the remote instance.
+* `AUTH2` -- Authenticate with the given username and password pair (Redis 6 or greater ACL auth style).
 
 @return
 
 @simple-string-reply: The command returns OK on success, or `NOKEY` if no keys were
-found in the source instance.  
+found in the source instance.

@@ -1,5 +1,8 @@
 Returns or stores the elements contained in the [list][tdtl], [set][tdts] or
 [sorted set][tdtss] at `key`.
+
+There is also the `SORT_RO` read-only variant of this command.
+
 By default, sorting is numeric and elements are compared by their value
 interpreted as double precision floating point number.
 This is `SORT` in its simplest form:
@@ -137,4 +140,5 @@ key is accessed to retrieve the specified hash field.
 
 @return
 
-@array-reply: list of sorted elements.
+@array-reply: without passing the `store` option the command returns a list of sorted elements.
+@integer-reply: when the `store` option is specified the command returns the number of sorted elements in the destination list.

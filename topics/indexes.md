@@ -24,7 +24,7 @@ elements ordered by a floating point number which is the *score* of
 each element. Elements are ordered from the smallest to the highest score.
 
 Since the score is a double precision float, indexes you can build with
-vanilla sorted sets are limited to things were the indexing field is a number
+vanilla sorted sets are limited to things where the indexing field is a number
 within a given range.
 
 The two commands to build these kind of indexes are `ZADD` and
@@ -101,7 +101,7 @@ Updating simple sorted set indexes
 Often we index things which change over time. In the above
 example, the age of the user changes every year. In such a case it would
 make sense to use the birth date as index instead of the age itself,
-but there are other cases where we simple want some field to change from
+but there are other cases where we simply want some field to change from
 time to time, and the index to reflect this change.
 
 The `ZADD` command makes updating simple indexes a very trivial operation
@@ -138,7 +138,7 @@ retrieve elements by radius.
 Limits of the score
 ---
 
-Sorted set elements scores are double precision integers. It means that
+Sorted set elements scores are double precision floats. It means that
 they can represent different decimal or integer values with different
 errors, because they use an exponential representation internally.
 However what is interesting for indexing purposes is that the score is
@@ -262,7 +262,7 @@ We also need logic in order to increment the index if the search term
 already exists in the index, so what we'll actually do is something like
 that:
 
-    ZRANGEBYLEX myindex "[banana:" + LIMIT 1 1
+    ZRANGEBYLEX myindex "[banana:" + LIMIT 0 1
     1) "banana:1"
 
 This will return the single entry of `banana` if it exists. Then we
@@ -284,13 +284,13 @@ There is more: our goal is to just have items searched very frequently.
 So we need some form of purging. When we actually query the index
 in order to complete the user input, we may see something like that:
 
-    ZRANGEBYLEX myindex "[banana:" + LIMIT 1 10
+    ZRANGEBYLEX myindex "[banana:" + LIMIT 0 10
     1) "banana:123"
-    2) "banahhh:1"
+    2) "banaooo:1"
     3) "banned user:49"
     4) "banning:89"
 
-Apparently nobody searches for "banahhh", for example, but the query was
+Apparently nobody searches for "banaooo", for example, but the query was
 performed a single time, so we end presenting it to the user.
 
 This is what we can do. Out of the returned items, we pick a random one,
@@ -315,7 +315,7 @@ One simple way do deal with this issues is to actually normalize the
 string the user searches. Whatever the user searches for "Banana",
 "BANANA" or "Ba'nana" we may always turn it into "banana".
 
-However sometimes we could like to present the user with the original
+However sometimes we may like to present the user with the original
 item typed, even if we normalize the string for indexing. In order to
 do this, what we do is to change the format of the index so that instead
 of just storing `term:frequency` we store `normalized:frequency:original`
@@ -348,7 +348,7 @@ we just store the entry as `key:value`:
 
 And search for the key with:
 
-    ZRANGEBYLEX myindex mykey: + LIMIT 1 1
+    ZRANGEBYLEX myindex [mykey: + LIMIT 0 1
     1) "mykey:myvalue"
 
 Then we extract the part after the colon to retrieve the value.
@@ -470,7 +470,7 @@ Representing and querying graphs using an hexastore
 
 One cool thing about composite indexes is that they are handy in order
 to represent graphs, using a data structure which is called
-[Hexastore](http://www.vldb.org/pvldb/1/1453965.pdf).
+[Hexastore](http://www.vldb.org/pvldb/vol1/1453965.pdf).
 
 The hexastore provides a representation for relations between objects,
 formed by a *subject*, a *predicate* and an *object*.
@@ -495,8 +495,8 @@ In can add 5 more entries for the same relation, but in a different order:
     ZADD myindex 0 pos:is-friend-of:matteocollina:antirez
 
 Now things start to be interesting, and I can query the graph in many
-different ways. For example, what are all the people `antirez`
-*is friend to*?
+different ways. For example, who are all the people `antirez`
+*is friend of*?
 
     ZRANGEBYLEX myindex "[spo:antirez:is-friend-of:" "[spo:antirez:is-friend-of:\xff"
     1) "spo:antirez:is-friend-of:matteocollina"
@@ -512,9 +512,9 @@ the first is the subject and the second is the object?
     3) "sop:antirez:matteocollina:talked-with"
 
 By combining different queries, I can ask fancy questions. For example:
-*What are all my friends that, like beer, live in Barcelona, and matteocollina consider friends as well?*
+*Who are all my friends that, like beer, live in Barcelona, and matteocollina consider friends as well?*
 To get this information I start with an `spo` query to find all the people
-I'm friend with. Than for each result I get I perform an `spo` query
+I'm friend with. Then for each result I get I perform an `spo` query
 to check if they like beer, removing the ones for which I can't find
 this relation. I do it again to filter by city. Finally I perform an `ops`
 query to find, of the list I obtained, who is considered friend by
@@ -525,15 +525,15 @@ Make sure to check [Matteo Collina's slides about Levelgraph](http://nodejsconfi
 Multi dimensional indexes
 ===
 
-A more complex type of index is an index that allows to perform queries
-where two or multiple variables are queried at the same time for specific
+A more complex type of index is an index that allows you to perform queries
+where two or more variables are queried at the same time for specific
 ranges. For example I may have a data set representing persons age and
 salary, and I want to retrieve all the people between 50 and 55 years old
 having a salary between 70000 and 85000.
 
 This query may be performed with a multi column index, but this requires
 us to select the first variable and then scan the second, which means we
-may do a lot more work than needed. It is possible to perform this kind of
+may do a lot more work than needed. It is possible to perform these kinds of
 queries involving multiple variables using different data structures.
 For example, multi-dimensional trees such as *k-d trees* or *r-trees* are
 sometimes used. Here we'll describe a different way to index data into
@@ -547,9 +547,9 @@ our coordinates. Both variables max value is 400.
 The blue box in the picture represents our query. We want all the points
 where `x` is between 50 and 100, and where `y` is between 100 and 300.
 
-![Points in the space](http://redis.io/images/redisdoc/2idx_0.png)
+![Points in the space](https://redis.io/images/redisdoc/2idx_0.png)
 
-In order to represent data that makes this kind of queries fast to perform,
+In order to represent data that makes these kinds of queries fast to perform,
 we start by padding our numbers with 0. So for example imagine we want to
 add the point 10,25 (x,y) to our index. Given that the maximum range in the
 example is 400 we can just pad to three digits, so we obtain:
@@ -577,7 +577,7 @@ earlier by interleaving the digits, obtaining:
     027050
 
 What happens if we substitute the last two digits respectively with 00 and 99?
-We obtain a range which is lexicographically continue:
+We obtain a range which is lexicographically continuous:
 
     027000 to 027099
 
@@ -586,7 +586,7 @@ variable is between 70 and 79, and the `y` variable is between 200 and 209.
 We can write random points in this interval, in order to identify this
 specific area:
 
-![Small area](http://redis.io/images/redisdoc/2idx_1.png)
+![Small area](https://redis.io/images/redisdoc/2idx_1.png)
 
 So the above lexicographic query allows us to easily query for points in
 a specific square in the picture. However the square may be too small for
@@ -601,7 +601,7 @@ This time the range represents all the points where `x` is between 0 and 99
 and `y` is between 200 and 299. Drawing random points in this interval
 shows us this larger area:
 
-![Large area](http://redis.io/images/redisdoc/2idx_2.png)
+![Large area](https://redis.io/images/redisdoc/2idx_2.png)
 
 Oops now our area is ways too big for our query, and still our search box is
 not completely included. We need more granularity, but we can easily obtain
@@ -631,7 +631,7 @@ And so forth. Now we have definitely better granularity!
 As you can see substituting N bits from the index gives us
 search boxes of side `2^(N/2)`.
 
-So what we do is to check the dimension where our search box is smaller,
+So what we do is check the dimension where our search box is smaller,
 and check the nearest power of two to this number. Our search box
 was 50,100 to 100,300, so it has a width of 50 and an height of 200.
 We take the smaller of the two, 50, and check the nearest power of two
@@ -644,8 +644,8 @@ What we do is to start with the left bottom corner of our search box,
 which is 50,100, and find the first range by substituting the last 6 bits
 in each number with 0. Then we do the same with the right top corner.
 
-With two trivial nested for loops where we increment only the significative
-bits, we can find all the squares between this two. For each square we
+With two trivial nested for loops where we increment only the significant
+bits, we can find all the squares between these two. For each square we
 convert the two numbers into our interleaved representation, and create
 the range using the converted representation as our start, and the same
 representation but with the latest 12 bits turned on as end range.
@@ -687,7 +687,7 @@ Turning this into code is simple. Here is a Ruby example:
 
 While non immediately trivial this is a very useful indexing strategy that
 in the future may be implemented in Redis in a native way.
-For now, the good thing is that the complexity may be easily incapsualted
+For now, the good thing is that the complexity may be easily encapsulated
 inside a library that can be used in order to perform indexing and queries.
 One example of such library is [Redimension](https://github.com/antirez/redimension), a proof of concept Ruby library which indexes N-dimensional data inside Redis using the technique described here.
 
@@ -719,7 +719,7 @@ property or not.
 
 Similarly lists can be used in order to index items into a fixed order.
 I can add all my items into a Redis list and rotate the list with
-RPOPLPUSH using the same key name as source and destination. This is useful
+`RPOPLPUSH` using the same key name as source and destination. This is useful
 when I want to process a given set of items again and again forever in the
 same order. Think of an RSS feed system that needs to refresh the local copy
 periodically.
